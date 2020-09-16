@@ -1,7 +1,10 @@
 import java.net.*;
 import java.io.*;
+import java.util.HashMap;
 
 public class PartialHTTP1Server {
+
+    private static HashMap<String, RequestHandler> handlerMap;
 
     public static void main(String[] args) {
 
@@ -24,6 +27,16 @@ public class PartialHTTP1Server {
             
             System.out.println("Server started on port: " + PORT);
 
+            handlerMap = new HashMap<>();
+            handlerMap.put("GET", PartialHTTP1Server::GET);
+            handlerMap.put("POST", PartialHTTP1Server::POST);
+            handlerMap.put("HEAD", PartialHTTP1Server::HEAD);
+            handlerMap.put("PUT", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+            handlerMap.put("DELETE", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+            handlerMap.put("LINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+            handlerMap.put("UNLINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+
+
             Socket clientSocket;
             while ((clientSocket = serverSocket.accept()) != null) {
                 System.out.println("New connection from client: " + clientSocket.getInetAddress());
@@ -32,13 +45,31 @@ public class PartialHTTP1Server {
 
         } catch (IOException e) {
             System.err.println("[Fatal Error] Failed to set up server");
+            e.printStackTrace();
         }
 
     }
  
     private static void addClient(Socket clientSocket) {
         // TODO: add to thread pool
-        new Thread(new ClientHandler(clientSocket)).start();;
+        new Thread(new ClientHandler(clientSocket, handlerMap)).start();;
     }
+
+
+
+    // --------- Method Handler Implementations --------------
+
+    private static String GET(String request) {
+        return "HTTP/1.0 " + StatusCode._200.toString();
+    }
+
+    private static String POST(String request) {
+        return GET(request);
+    }
+
+    private static String HEAD(String request) {
+        return "HTTP/1.0 " + StatusCode._200.toString();
+    }
+
     
 }
