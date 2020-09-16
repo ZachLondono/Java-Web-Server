@@ -22,6 +22,8 @@ public class PartialHTTP1Server {
 
         try(ServerSocket serverSocket = new ServerSocket(PORT)) {
             
+            System.out.println("Server started on port: " + PORT);
+
             Socket clientSocket;
             while ((clientSocket = serverSocket.accept()) != null) {
                 System.out.println("New connection from client: " + clientSocket.getInetAddress());
