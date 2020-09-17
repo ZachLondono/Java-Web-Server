@@ -52,25 +52,29 @@ public class PartialHTTP1Server {
  
     private static void addClient(Socket clientSocket) {
         // TODO: add to thread pool
-        new Thread(new ClientHandler(clientSocket, handlerMap)).start();;
+        //make 50 threads in total, 1 for each client connection 
+        //51th thread to return error if it exceeds 50
+        new Thread(new ClientHandler(clientSocket, handlerMap)).start();
     }
 
 
 
     // --------- Method Handler Implementations --------------
+    
     static interface RequestHandler {
-        abstract String handler(String request);
+        abstract String handler(String[] request);
     }
 
-    private static String GET(String request) {
+    private static String GET(String[] request) { 
+        
         return "HTTP/1.0 " + StatusCode._200.toString();
     }
 
-    private static String POST(String request) {
+    private static String POST(String[] request) {
         return GET(request);
     }
 
-    private static String HEAD(String request) {
+    private static String HEAD(String[] request) {
         return "HTTP/1.0 " + StatusCode._200.toString();
     }
 
