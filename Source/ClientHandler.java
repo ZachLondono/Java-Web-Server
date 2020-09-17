@@ -6,9 +6,9 @@ public class ClientHandler implements Runnable {
 
     private final String supportedVerison = "HTTP/1.0";
     private Socket clientSocket;
-    private HashMap<String, RequestHandler> handlerMap;
+    private HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap;
 
-    public ClientHandler(Socket clientSocket, HashMap<String, RequestHandler> handlerMap) {
+    public ClientHandler(Socket clientSocket, HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap) {
         this.clientSocket = clientSocket;
         this.handlerMap = handlerMap;
     }
@@ -26,7 +26,7 @@ public class ClientHandler implements Runnable {
             //      readLine()
             //      sendResponse(output, request)   
             // send timeout
-
+	
             String request = reader.readLine();
             sendResponse(request, output);
 

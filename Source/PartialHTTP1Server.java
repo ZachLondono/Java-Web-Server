@@ -58,6 +58,9 @@ public class PartialHTTP1Server {
 
 
     // --------- Method Handler Implementations --------------
+    static interface RequestHandler {
+        abstract String handler(String request);
+    }
 
     private static String GET(String request) {
         return "HTTP/1.0 " + StatusCode._200.toString();
