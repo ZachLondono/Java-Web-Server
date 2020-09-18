@@ -1,4 +1,5 @@
 import java.net.*;
+import java.nio.CharBuffer;
 import java.io.*;
 import java.util.*;
 
@@ -33,24 +34,26 @@ public class ClientHandler implements Runnable {
 
             if (!timedOut) {
 
-	        // Read in all lines from client
-                String line;
-                ArrayList<String> lines = new ArrayList<>();		
-                while (reader.ready() && (line = reader.readLine()) != null) {
-			lines.add(line);
-			System.out.println(lines.get(lines.size() - 1));
-		}
-
-                String[] request = lines.toArray(String[]::new); 
+                // Read in all lines from client into a buffer
+                int offset = 0;
+                char[] cbuf = new char[1024];
+                int readin;
+                while (reader.ready() && (readin = reader.read(cbuf, offset, cbuf.length - offset)) != -1) {
+                    offset += readin;
+                    if (cbuf.length == offset) cbuf = Arrays.copyOf(cbuf, cbuf.length * 2);
+                }
+                
+                String[] request = String.valueOf(cbuf).split("\n"); 
                 String[] fields = request[0].split(Character.toString(32));	// split the first line into fields to validate request
-		
-		// Check that request is valid
-                if (fields.length != 3) response = StatusCode._400.toString();
-                else if (!fields[2].equals(supportedVerison)) response = supportedVerison + " " + StatusCode._505.toString();
-                else if (!handlerMap.containsKey(fields[0])) response = supportedVerison + " " + StatusCode._400.toString();
+            
+                // Check that request is valid
+                if (cbuf[offset - 1] != '\n') response = StatusCode._400.toString();    // check that request is terminated by a new line
+                else if (fields.length != 3) response = StatusCode._400.toString();     // check that the request line contains only 3 fields
+                else if (!fields[2].equals(supportedVerison)) response = supportedVerison + " " + StatusCode._505.toString();   // check the client http version
+                else if (!handlerMap.containsKey(fields[0])) response = supportedVerison + " " + StatusCode._400.toString();    // check that the request is valid method
                 else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
-           
-	   }
+            
+            }
 
             System.out.println("Sending: " + response);
             output.writeBytes(response);	// Send response back to client
@@ -70,6 +73,5 @@ public class ClientHandler implements Runnable {
             System.err.println("[Error] failed to communicate with client");
         }
     }
-
 
 }
