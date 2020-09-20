@@ -1,14 +1,20 @@
 import java.net.*;
 import java.io.*;
-import java.util.HashMap;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class PartialHTTP1Server {
 
+    public static final String SUPPORTED_VERSION = "HTTP/1.0";
+    public static final int MAXIMUM_THREAD_COUNT = 50; 
+    private static int activeThreadCount;
     private static HashMap<String, RequestHandler> handlerMap;
+    private static HashMap<String, String> mimeMap;
 
     public static void main(String[] args) {
 
         final int PORT;
+        ExecutorService executor = Executors.newCachedThreadPool();
 
         if (args.length != 1) {
             System.err.println("[Fatal Error] First argument must be the port number for the server to listen on");
@@ -35,12 +41,26 @@ public class PartialHTTP1Server {
             handlerMap.put("DELETE", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
             handlerMap.put("LINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
             handlerMap.put("UNLINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+            
+            mimeMap = new HashMap<>();
+            mimeMap.put("html", "text/html");
+            mimeMap.put("htm", "text/html");
+            mimeMap.put("txt", "text/plain");
+            mimeMap.put("jpg", "image/jpeg");
+            mimeMap.put("jpeg", "text/jpeg");
+            mimeMap.put("png", "text/png");
+            mimeMap.put("gif", "text/gif");
+            mimeMap.put("pdf", "application/pdf");
+            mimeMap.put("gz", "application/x-gzip");
+            mimeMap.put("zip", "application/zip");
 
+            activeThreadCount = 0;
 
             Socket clientSocket;
             while ((clientSocket = serverSocket.accept()) != null) {
-                System.out.println("New connection from client: " + clientSocket.getInetAddress());
-                addClient(clientSocket);
+                System.out.println("New Connection From: " + clientSocket.getInetAddress());
+                activeThreadCount++;
+                executor.submit(new ClientHandler(clientSocket, handlerMap));
             }
 
         } catch (IOException e) {
@@ -49,15 +69,26 @@ public class PartialHTTP1Server {
         }
 
     }
- 
-    private static void addClient(Socket clientSocket) {
-        // TODO: add to thread pool
-        //make 50 threads in total, 1 for each client connection 
-        //51th thread to return error if it exceeds 50
-        new Thread(new ClientHandler(clientSocket, handlerMap)).start();
+
+    public synchronized static int getActiveCount() {
+        return activeThreadCount;
     }
 
+    public synchronized static void setActiveCount(int new_count) {
+        activeThreadCount = new_count;
+    }
 
+    private String getMimeType(String path) {
+
+        String extension = path.substring(path.lastIndexOf(".") + 1);
+        String mimeType = "";
+        if (mimeMap.containsKey(extension)) {
+            mimeType = mimeMap.get(extension);
+        } else mimeType = "application/octet-stream";
+
+        return mimeType;
+
+    }
 
     // --------- Method Handler Implementations --------------
     
@@ -66,7 +97,6 @@ public class PartialHTTP1Server {
     }
 
     private static String GET(String[] request) { 
-        
         return "HTTP/1.0 " + StatusCode._200.toString();
     }
 

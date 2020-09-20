@@ -1,11 +1,9 @@
 import java.net.*;
-import java.nio.CharBuffer;
 import java.io.*;
 import java.util.*;
 
 public class ClientHandler implements Runnable {
 
-    private final String supportedVerison = "HTTP/1.0";
     private Socket clientSocket;
     private HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap;
 
@@ -20,58 +18,69 @@ public class ClientHandler implements Runnable {
                 DataOutputStream output = new DataOutputStream(clientSocket.getOutputStream());) {
 
             String response = "";
-	    
-            boolean timedOut = false;
+
+            if(PartialHTTP1Server.getActiveCount() > PartialHTTP1Server.MAXIMUM_THREAD_COUNT) {        // If maximum thread count was reached, deny service to client
+                System.out.println("Connection from " + clientSocket.getInetAddress() + " denied: Maximum connected clients reached");
+                response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._503.toString();     
+                sendResponseAndClose(output, response);
+                reader.close();
+                return;
+            }
+
             long connectedTime = System.currentTimeMillis();
             while (!reader.ready()) {
                 if (System.currentTimeMillis() - connectedTime > 5000) {        // Check if elapsed time since connection is over 5 seconds
                     // Client has timed out
-                    response = supportedVerison + " " + StatusCode._408.toString();
-                    timedOut = true;
-		    break;
+                    System.out.println("Connection from " + clientSocket.getInetAddress() + " denied: Client timed out");
+                    response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._408.toString();       
+                    sendResponseAndClose(output, response);
+                    reader.close();
+		            return;
                 }
             }
 
-            if (!timedOut) {
-
-                // Read in all lines from client into a buffer
-                int offset = 0;
-                char[] cbuf = new char[1024];
-                int readin;
-                while (reader.ready() && (readin = reader.read(cbuf, offset, cbuf.length - offset)) != -1) {
-                    offset += readin;
-                    if (cbuf.length == offset) cbuf = Arrays.copyOf(cbuf, cbuf.length * 2);
-                }
-                
-                String[] request = String.valueOf(cbuf).split("\n"); 
-                String[] fields = request[0].split(Character.toString(32));	// split the first line into fields to validate request
-            
-                // Check that request is valid
-                if (cbuf[offset - 1] != '\n') response = StatusCode._400.toString();    // check that request is terminated by a new line
-                else if (fields.length != 3) response = StatusCode._400.toString();     // check that the request line contains only 3 fields
-                else if (!fields[2].equals(supportedVerison)) response = supportedVerison + " " + StatusCode._505.toString();   // check the client http version
-                else if (!handlerMap.containsKey(fields[0])) response = supportedVerison + " " + StatusCode._400.toString();    // check that the request is valid method
-                else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
-            
+            // Read in all lines from client into a buffer
+            int offset = 0;
+            char[] cbuf = new char[1024];
+            int readin;
+            while (reader.ready() && (readin = reader.read(cbuf, offset, cbuf.length - offset)) != -1) {
+                offset += readin;
+                if (cbuf.length == offset) cbuf = Arrays.copyOf(cbuf, cbuf.length * 2);
             }
+            
+            System.out.println("====================================================\nRecieved request from: " + clientSocket.getInetAddress() + "\n********************************************\n" + String.valueOf(cbuf) + "====================================================");
+        
+            String[] request = String.valueOf(cbuf).split("\n"); 
+            String[] fields = request[0].split(Character.toString(32));	// split the first line into fields to validate request
 
-            System.out.println("Sending: " + response);
-            output.writeBytes(response);	// Send response back to client
-            output.flush();
+            // Check that request is valid
+            if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
+            else if (fields.length != 3) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();     // check that the request line contains only 3 fields
+            else if (!fields[2].trim().equals(PartialHTTP1Server.SUPPORTED_VERSION)) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString();   // check the client http version
+            else if (!handlerMap.containsKey(fields[0])) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();    // check that the request is valid method
+            else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
 
-            try {
-                Thread.sleep(250);	// Wait 1/4 second
-            } catch(InterruptedException e) {
-                System.err.println("[Error] error occured while sending message to client");
-            }
-
-            // Close socket I/O
+            sendResponseAndClose(output, response);
             reader.close();
-            output.close();
-
+            
         } catch(IOException e) {
             System.err.println("[Error] failed to communicate with client");
         }
     }
 
+    private void sendResponseAndClose(DataOutputStream output, String response) throws IOException {
+        System.out.println("====================================================\nSending response to: " + clientSocket.getInetAddress() + "\n********************************************\n" + response + "\n====================================================");
+        if (response.charAt(response.length()-1) != '\n') response = response + "\n";
+        output.writeBytes(response);	// Send response back to client
+        output.flush();
+        try {
+            Thread.sleep(250);	// Wait 1/4 second
+        } catch(InterruptedException e) {
+            System.err.println("[Error] error occured while sending message to client");
+        }
+        System.out.println("Closing connection with client: " + clientSocket.getInetAddress());
+        output.close();
+        clientSocket.close();
+        PartialHTTP1Server.setActiveCount(PartialHTTP1Server.getActiveCount()-1);
+    }
 }
