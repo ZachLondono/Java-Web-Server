@@ -37,10 +37,10 @@ public class PartialHTTP1Server {
             handlerMap.put("GET", PartialHTTP1Server::GET);
             handlerMap.put("POST", PartialHTTP1Server::POST);
             handlerMap.put("HEAD", PartialHTTP1Server::HEAD);
-            handlerMap.put("PUT", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
-            handlerMap.put("DELETE", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
-            handlerMap.put("LINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
-            handlerMap.put("UNLINK", (request) ->  "HTTP/1.0" + StatusCode._501.toString());
+            handlerMap.put("PUT", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
+            handlerMap.put("DELETE", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
+            handlerMap.put("LINK", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
+            handlerMap.put("UNLINK", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
             
             mimeMap = new HashMap<>();
             mimeMap.put("html", "text/html");
