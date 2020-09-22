@@ -9,7 +9,6 @@ public class PartialHTTP1Server {
     public static final int MAXIMUM_THREAD_COUNT = 50; 
     private static int activeThreadCount;
     private static HashMap<String, RequestHandler> handlerMap;
-    private static HashMap<String, String> mimeMap;
 
     public static void main(String[] args) {
 
@@ -32,34 +31,25 @@ public class PartialHTTP1Server {
         try(ServerSocket serverSocket = new ServerSocket(PORT)) {
             
             System.out.println("Server started on port: " + PORT);
-
+	
+	    // Maps a given function name to it's defined method
             handlerMap = new HashMap<>();
             handlerMap.put("GET", PartialHTTP1Server::GET);
             handlerMap.put("POST", PartialHTTP1Server::POST);
             handlerMap.put("HEAD", PartialHTTP1Server::HEAD);
+	    // The following functions are not implimented
             handlerMap.put("PUT", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
             handlerMap.put("DELETE", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
             handlerMap.put("LINK", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
             handlerMap.put("UNLINK", (request) ->  "HTTP/1.0 " + StatusCode._501.toString());
             
-            mimeMap = new HashMap<>();
-            mimeMap.put("html", "text/html");
-            mimeMap.put("htm", "text/html");
-            mimeMap.put("txt", "text/plain");
-            mimeMap.put("jpg", "image/jpeg");
-            mimeMap.put("jpeg", "text/jpeg");
-            mimeMap.put("png", "text/png");
-            mimeMap.put("gif", "text/gif");
-            mimeMap.put("pdf", "application/pdf");
-            mimeMap.put("gz", "application/x-gzip");
-            mimeMap.put("zip", "application/zip");
-
             activeThreadCount = 0;
 
             Socket clientSocket;
             while ((clientSocket = serverSocket.accept()) != null) {
+	        // Accepts a new connection from a client and submits it to a thread executor to be handled by the thread handler
                 System.out.println("New Connection From: " + clientSocket.getInetAddress());
-                activeThreadCount++;
+		setActiveCount(getActiveCount() + 1);
                 executor.submit(new ClientHandler(clientSocket, handlerMap));
             }
 
@@ -70,6 +60,7 @@ public class PartialHTTP1Server {
 
     }
 
+    // Both static functions used to interface with the static activeThreadCount variable are synchronized in order to restrict only 1 thread to access either at a time
     public synchronized static int getActiveCount() {
         return activeThreadCount;
     }
@@ -78,13 +69,41 @@ public class PartialHTTP1Server {
         activeThreadCount = new_count;
     }
 
-    private String getMimeType(String path) {
+    private static String getMimeType(String path) {
 
-        String extension = path.substring(path.lastIndexOf(".") + 1);
+	// extracts the extension from a given file path and returns it's mime type
+        String extension = (path.substring(path.lastIndexOf(".") + 1)).toLowerCase();
         String mimeType = "";
-        if (mimeMap.containsKey(extension)) {
-            mimeType = mimeMap.get(extension);
-        } else mimeType = "application/octet-stream";
+	switch (extension) {
+	    case "html":
+	    case "htm":
+	    	mimeType = "text/html";
+	        break;
+	    case "txt":
+	        mimeType = "text/plain";
+		break;
+	    case "jpg":
+	    case "jpeg":
+		mimeType = "image/jpeg";
+		break;
+	    case "png":
+	        mimeType = "image/png";
+		break;
+	    case "gif":
+		mimeType = "image/gif";
+		break;
+	    case "pdf":
+		mimeType = "application/pdf";
+		break;
+	    case "gz":
+		mimeType = "application/x-gzip";
+		break;
+	    case "zip":
+		mimeType = "application/zip";
+		break;
+	    default:
+	    	mimeType = "application/octet-stream";
+	}
 
         return mimeType;
 
@@ -97,7 +116,14 @@ public class PartialHTTP1Server {
     }
 
     private static String GET(String[] request) { 
-        return "HTTP/1.0 " + StatusCode._200.toString();
+    	String response = 
+		"HTTP/1.0 200 OK\n" +
+		"Content-Type:" + getMimeType(request[0].split(" ")[1]) +"\n\n" +
+		"<html>" +
+		"<h1>Hello World</h1>" +
+		"</html>";
+        //return "HTTP/1.0 " + StatusCode._200.toString();
+	return response;
     }
 
     private static String POST(String[] request) {
