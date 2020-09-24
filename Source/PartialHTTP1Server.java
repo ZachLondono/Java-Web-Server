@@ -1,4 +1,5 @@
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -71,42 +72,58 @@ public class PartialHTTP1Server {
 
     private static String getMimeType(String path) {
 
-	// extracts the extension from a given file path and returns it's mime type
+	    // extracts the extension from a given file path and returns it's mime type
         String extension = (path.substring(path.lastIndexOf(".") + 1)).toLowerCase();
         String mimeType = "";
-	switch (extension) {
-	    case "html":
-	    case "htm":
-	    	mimeType = "text/html";
-	        break;
-	    case "txt":
-	        mimeType = "text/plain";
-		break;
-	    case "jpg":
-	    case "jpeg":
-		mimeType = "image/jpeg";
-		break;
-	    case "png":
-	        mimeType = "image/png";
-		break;
-	    case "gif":
-		mimeType = "image/gif";
-		break;
-	    case "pdf":
-		mimeType = "application/pdf";
-		break;
-	    case "gz":
-		mimeType = "application/x-gzip";
-		break;
-	    case "zip":
-		mimeType = "application/zip";
-		break;
-	    default:
-	    	mimeType = "application/octet-stream";
-	}
+        switch (extension) {
+            case "html":
+            case "htm":
+                mimeType = "text/html";
+                break;
+            case "txt":
+                mimeType = "text/plain";
+                break;
+            case "jpg":
+            case "jpeg":
+                mimeType = "image/jpeg";
+                break;
+            case "png":
+                mimeType = "image/png";
+                break;
+            case "gif":
+                mimeType = "image/gif";
+                break;
+            case "pdf":
+                mimeType = "application/pdf";
+                break;
+            case "gz":
+                mimeType = "application/x-gzip";
+                break;
+            case "zip":
+                mimeType = "application/zip";
+                break;
+            default:
+                mimeType = "application/octet-stream";
+        }
 
         return mimeType;
 
+    }
+
+    // Returns the content of a given file as an array of the file's bytes, if its unable to read the file for any reason it will return null
+    private static byte[] getFileContent(File file) {
+        try (FileInputStream reader = new FileInputStream(file)) {
+            int offset = 0;
+            byte[] buf = new byte[1024];
+            int readin;
+            while ((readin = reader.read(buf, offset, buf.length - offset)) != -1) {
+                offset += readin;
+                if (buf.length == offset) buf = Arrays.copyOf(buf, buf.length * 2);
+            }
+            return Arrays.copyOfRange(buf,0, offset);
+        } catch(Exception e) {
+            return null;
+        }
     }
 
     // --------- Method Handler Implementations --------------
