@@ -17,11 +17,11 @@ public class ClientHandler implements Runnable {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 DataOutputStream output = new DataOutputStream(clientSocket.getOutputStream());) {
 
-            String response = "";
+            byte[] response = {};
 
             if(PartialHTTP1Server.getActiveCount() > PartialHTTP1Server.MAXIMUM_THREAD_COUNT) {        // If maximum thread count was reached, deny service to client
                 System.out.println("Connection from " + clientSocket.getInetAddress() + " denied: Maximum connected clients reached");
-                response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._503.toString();     
+                response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._503.toString()).getBytes();     
                 sendResponseAndClose(output, response);
                 reader.close();
                 return;
@@ -32,7 +32,7 @@ public class ClientHandler implements Runnable {
                 if (System.currentTimeMillis() - connectedTime > 5000) {        // Check if elapsed time since connection is over 5 seconds
                     // Client has timed out
                     System.out.println("Connection from " + clientSocket.getInetAddress() + " denied: Client timed out");
-                    response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._408.toString();       
+                    response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._408.toString()).getBytes();       
                     sendResponseAndClose(output, response);
                     reader.close();
 		            return;
@@ -54,10 +54,10 @@ public class ClientHandler implements Runnable {
             String[] fields = request[0].split(" ");	// split the first line into fields to validate request
 
             // Check that request is valid
-            if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
-            else if (fields.length != 3) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();     // check that the request line contains only 3 fields
-            else if (!fields[2].trim().equals(PartialHTTP1Server.SUPPORTED_VERSION)) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString();   // check the client http version
-            else if (!handlerMap.containsKey(fields[0])) response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();    // check that the request is valid method
+            if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
+            else if (fields.length != 3) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();     // check that the request line contains only 3 fields
+            else if (!fields[2].trim().equals(PartialHTTP1Server.SUPPORTED_VERSION)) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString()).getBytes();   // check the client http version
+            else if (!handlerMap.containsKey(fields[0])) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // check that the request is valid method
             else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
 
             sendResponseAndClose(output, response);
@@ -68,10 +68,10 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void sendResponseAndClose(DataOutputStream output, String response) throws IOException {
+    private void sendResponseAndClose(DataOutputStream output, byte[] response) throws IOException {
         System.out.println("====================================================\nSending response to: " + clientSocket.getInetAddress() + "\n********************************************\n" + response + "\n====================================================");
-        if (response.charAt(response.length()-1) != '\n') response = response + "\n";
-        output.writeBytes(response);	// Send response back to client
+        // if (response.charAt(response.length()-1) != '\n') response = response + "\n";
+        output.write(response);	// Send response back to client
         output.flush();
         try {
             Thread.sleep(250);	// Wait 1/4 second
