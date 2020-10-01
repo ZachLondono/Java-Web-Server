@@ -132,7 +132,7 @@ public class PartialHTTP1Server {
         }
     }
 
-    private static String getHeader(File file) throws FileNotFoundException, AccessDeniedException {
+    private static String getHeaders(File file) throws FileNotFoundException, AccessDeniedException {
 
         if(!file.exists()) throw new FileNotFoundException();
 
@@ -169,7 +169,6 @@ public class PartialHTTP1Server {
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 
-
         Date date1 = null;
         int truth = 0;
         //we have to split up the lines. We really only need two lines. First we have to check if request.length is greater than 1. If its greater than 1 then we take the first and check the rest. The moment we reach something that matches If-Modified-Since: then we can save that and stop the for loop looking for it.
@@ -201,13 +200,13 @@ public class PartialHTTP1Server {
             File file = new File(cwd + "/"+ resource);
         
             // Generate headers for response
-            response += getHeader(file);
+            response += getHeaders(file);
 
             Date checkIfGreater1 = new Date(file.lastModified());
 
             // if truth == 1 that means that the request contains a valid if-modified-since header 
             if (truth == 1 && checkIfGreater1.compareTo(date1)<0){
-                response = "HTTP/1.0 " + StatusCode._304.toString();
+                response = "HTTP/1.0 " + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;;
             } else { // if truth == 0 || (truth == 1 && checkIfGreater1.compareTo(date1) >= 0) 
 
                 byte[] payload = getFileContent(file);
@@ -244,14 +243,14 @@ public class PartialHTTP1Server {
 
         String[] fields = request[0].split(" ");
         String resource = fields[1];        
-        String response = "HTTP/1.0" + " "+ StatusCode._200.toString() + CRLF;
+        String response = "HTTP/1.0 " + StatusCode._200.toString() + CRLF;
 
         try{
         
             String cwd = new java.io.File(".").getCanonicalPath();
             System.out.println(cwd + "/"+ resource);
             File file = new File(cwd + "/"+ resource);
-            response += getHeader(file);
+            response += getHeaders(file);
 
         }catch (AccessDeniedException e) {
             response = "HTTP/1.0 " + StatusCode._403.toString();
