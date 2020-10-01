@@ -133,23 +133,186 @@ public class PartialHTTP1Server {
     }
 
     private static String GET(String[] request) { 
-    	String response = 
-		"HTTP/1.0 200 OK\n" +
-		"Content-Type:" + getMimeType(request[0].split(" ")[1]) +"\n\n" +
-		"<html>" +
-		"<h1>Hello World</h1>" +
-		"</html>";
-        //return "HTTP/1.0 " + StatusCode._200.toString();
-	return response;
+        Date date1 = null;
+        int truth = 0;
+        String lineRequest = request[0];
+        String[] fields = request[0].split(Character.toString(32));
+        String resource = fields[1];
+        //building header
+        String header = "";
+        header += "HTTP/1.0" + " "+ StatusCode._200.toString() + '\n';
+        String contentType = "";
+        header += "Content-Type: " + contentType + '\n';
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+        //first we must separate request---
+        //we have to split up the lines. We really only need two lines. First we have to check if request.length is greater than 1. If its greater than 1 then we take the first and check the rest. The moment we reach something that matches If-Modified-Since: then we can save that and stop the for loop looking for it.
+        if (request.length > 1){
+
+            //we must extract the If modified since value.
+            String test = "If-Modified-Since:";
+            String lastmodified = "";
+            int x = 0;
+            for(x=0;x<request.length;x++){
+                String find = request[x].substring(0,request[x].indexOf(' '));
+                if(find.equals(test)) {
+                    truth = 1;
+                    lastmodified = request[x];
+                    lastmodified = lastmodified.substring(lastmodified.indexOf(' ') + 1,lastmodified.length());
+                    try{
+                        date1 = sdf.parse(lastmodified);
+                        //System.out.println("This is lastmodified line:" + date1);
+                    }
+                    catch(ParseException ex){
+                        //do somethign here
+                        truth = 0;
+                        //System.out.println("Parsing didnt work this is lastmodified:" + lastmodified);
+                    }
+                    break;
+                }
+            }
+            
+        }
+        //System.out.println("This is the line request:" + lineRequest);
+        //We will now take the resource packet from the line request
+        //System.out.println("This is the resource we have to examine: " + resource);
+        //FOR CONTENT LENGTHmak
+        try{
+            
+            String cwd = new java.io.File(".").getCanonicalPath();
+            File file = new File(cwd + resource);
+            boolean exists = file.exists();
+            Path path = Paths.get(cwd);
+            if(exists == false) {
+                return "HTTP/1.0" + " " + StatusCode._404.toString();
+            }
+            //System.out.println("File Length:" + file.length());
+            boolean readable = Files.isReadable(path);
+            if(readable == false){
+                return "HTTP/1.0" + " " + StatusCode._403.toString();
+            }
+            header += "Content-Length: " + file.length() + '\n';
+            // System.out.println("File last modified:" + file.lastModified());
+        }catch(IOException e){
+        }
+        //FOR CONTENT LAST MODIFIED
+        try{
+            //check if truth is 1 if it is 1 then we must compare the dates if not just normally continue printing out the date.
+            String cwd = new java.io.File(".").getCanonicalPath();
+            File file = new File(cwd + resource);
+            String checkIfGreater = sdf.format(file.lastModified());
+            Date checkIfGreater1 = sdf.parse(checkIfGreater);
+            if(truth == 1){
+                if (checkIfGreater1.compareTo(date1)<0){
+                    return("HTTP/1.0" + " " + StatusCode._304.toString());
+                }
+            }
+            //System.out.println("File last modified:" + checkIfGreater);
+            header += "Last-Modified: " + checkIfGreater + '\n';
+            // System.out.println("File last modified:" + file.lastModified());
+        }catch(Exception e){
+        }
+        header += "Content-Encoding: identity" + '\n';
+        header += '\n' + "Some numbers go here";
+        return header;
+       
+        //System.out.println("lastModifiedTime: " + attr.lastModifiedTime());
+        //WORK ON GETTING LAST MODIFIED TO WORK AND RUN PROPERLY, IF THE NUMBERS GREATER THAN THE IF CONDIITON THEN BREAK WITH SOME SORT OF ERROR MESSAGe. WORK ON ERROR MESSAGES THEN FIGURE OUT SENDING FILES
+        // return "HTTP/1.0 " + StatusCode._200.toString();
     }
 
     private static String POST(String[] request) {
+
         return GET(request);
     }
 
     private static String HEAD(String[] request) {
-        return "HTTP/1.0 " + StatusCode._200.toString();
-    }
+        Date date1 = null;
+        int truth = 0;
+        String lineRequest = request[0];
+        String[] fields = request[0].split(Character.toString(32));
+        String resource = fields[1];
+        //building header
+        String header = "";
+        header += "HTTP/1.0" + " "+ StatusCode._200.toString() + '\n';
+        String contentType = "";
+        header += "Content-Type: " + contentType + '\n';
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+        //first we must separate request---
+        //we have to split up the lines. We really only need two lines. First we have to check if request.length is greater than 1. If its greater than 1 then we take the first and check the rest. The moment we reach something that matches If-Modified-Since: then we can save that and stop the for loop looking for it.
+        if (request.length > 1){
 
+            //we must extract the If modified since value.
+            String test = "If-Modified-Since:";
+            String lastmodified = "";
+            int x = 0;
+            for(x=0;x<request.length;x++){
+                String find = request[x].substring(0,request[x].indexOf(' '));
+                if(find.equals(test)) {
+                    truth = 1;
+                    lastmodified = request[x];
+                    lastmodified = lastmodified.substring(lastmodified.indexOf(' ') + 1,lastmodified.length());
+                    try{
+                        date1 = sdf.parse(lastmodified);
+                        //System.out.println("This is lastmodified line:" + date1);
+                    }
+                    catch(ParseException ex){
+                        //do somethign here
+                        truth = 0;
+                        //System.out.println("Parsing didnt work this is lastmodified:" + lastmodified);
+                    }
+                    break;
+                }
+            }
+            
+        }
+        //System.out.println("This is the line request:" + lineRequest);
+        //We will now take the resource packet from the line request
+        //System.out.println("This is the resource we have to examine: " + resource);
+        //FOR CONTENT LENGTHmak
+        try{
+            
+            String cwd = new java.io.File(".").getCanonicalPath();
+            File file = new File(cwd + resource);
+            boolean exists = file.exists();
+            Path path = Paths.get(cwd);
+            if(exists == false) {
+                return "HTTP/1.0" + " " + StatusCode._404.toString();
+            }
+            //System.out.println("File Length:" + file.length());
+            boolean readable = Files.isReadable(path);
+            if(readable == false){
+                return "HTTP/1.0" + " " + StatusCode._403.toString();
+            }
+            header += "Content-Length: " + file.length() + '\n';
+            // System.out.println("File last modified:" + file.lastModified());
+        }catch(IOException e){
+        }
+        //FOR CONTENT LAST MODIFIED
+        try{
+            //check if truth is 1 if it is 1 then we must compare the dates if not just normally continue printing out the date.
+            String cwd = new java.io.File(".").getCanonicalPath();
+            File file = new File(cwd + resource);
+            String checkIfGreater = sdf.format(file.lastModified());
+            Date checkIfGreater1 = sdf.parse(checkIfGreater);
+            // if(truth == 1){
+            //     if (checkIfGreater1.compareTo(date1)<0){
+            //         return("HTTP/1.0" + " " + StatusCode._304.toString());
+            //     }
+            // }
+            //System.out.println("File last modified:" + checkIfGreater);
+            header += "Last-Modified: " + checkIfGreater + '\n';
+            // System.out.println("File last modified:" + file.lastModified());
+        }catch(Exception e){
+        }
+        header += "Content-Encoding: identity" + '\n';
+        header += '\n' + "Some numbers go here";
+        return header;
+       
+        //System.out.println("lastModifiedTime: " + attr.lastModifiedTime());
+        //WORK ON GETTING LAST MODIFIED TO WORK AND RUN PROPERLY, IF THE NUMBERS GREATER THAN THE IF CONDIITON THEN BREAK WITH SOME SORT OF ERROR MESSAGe. WORK ON ERROR MESSAGES THEN FIGURE OUT SENDING FILES
+        // return "HTTP/1.0 " + StatusCode._200.toString();
+    }
     
 }

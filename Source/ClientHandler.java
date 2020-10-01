@@ -51,7 +51,7 @@ public class ClientHandler implements Runnable {
             System.out.println("====================================================\nRecieved request from: " + clientSocket.getInetAddress() + "\n********************************************\n" + String.valueOf(cbuf) + "====================================================");
         
             String[] request = String.valueOf(cbuf).split("\n"); 
-            String[] fields = request[0].split(Character.toString(32));	// split the first line into fields to validate request
+            String[] fields = request[0].split(" ");	// split the first line into fields to validate request
 
             // Check that request is valid
             if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
