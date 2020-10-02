@@ -42,10 +42,10 @@ public class PartialHTTP1Server {
             handlerMap.put("POST", PartialHTTP1Server::POST);
             handlerMap.put("HEAD", PartialHTTP1Server::HEAD);
             // The following functions are not implimented
-            handlerMap.put("PUT", (request) ->  ("HTTP/1.0 " + StatusCode._501.toString()).getBytes());
-            handlerMap.put("DELETE", (request) ->("HTTP/1.0 " + StatusCode._501.toString()).getBytes());
-            handlerMap.put("LINK", (request) ->  ("HTTP/1.0 " + StatusCode._501.toString()).getBytes());
-            handlerMap.put("UNLINK", (request) ->  ("HTTP/1.0 " + StatusCode._501.toString()).getBytes());
+            handlerMap.put("PUT", (request) ->  (SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
+            handlerMap.put("DELETE", (request) ->(SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
+            handlerMap.put("LINK", (request) ->  (SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
+            handlerMap.put("UNLINK", (request) ->  (SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
             
             activeThreadCount = 0;
 
@@ -158,7 +158,7 @@ public class PartialHTTP1Server {
         String[] fields = request[0].split(Character.toString(32));
         String resource = fields[1];
         
-        String response = "HTTP/1.0" + " "+ StatusCode._200.toString() + CRLF;
+        String response = SUPPORTED_VERSION + " "+ StatusCode._200.toString() + CRLF;
         
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -184,7 +184,7 @@ public class PartialHTTP1Server {
                             Date lastModifiedDate = new Date(file.lastModified());
                             // Compare it against file's last modified date, if the file is older than the ifModifiedDate, then we return status 304 Not Modified, with the expiration date 
                             if (lastModifiedDate.compareTo(ifModifiedDate) < 0)
-                                response = "HTTP/1.0 " + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;;
+                                response = SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;;
                             break;
                         } catch(ParseException ex){
                             // malformed if-modified-since, ignore it
@@ -207,11 +207,11 @@ public class PartialHTTP1Server {
             return message;
 
         }catch (AccessDeniedException e) {
-            response = "HTTP/1.0 " + StatusCode._403.toString();
+            response = SUPPORTED_VERSION + " "  + StatusCode._403.toString();
         }catch (FileNotFoundException e) {
-            response = "HTTP/1.0 " + StatusCode._404.toString();
+            response = SUPPORTED_VERSION + " "  + StatusCode._404.toString();
         }catch (IOException e){
-            response = "HTTP/1.0 " + StatusCode._500;   
+            response = SUPPORTED_VERSION + " "  + StatusCode._500;   
             e.printStackTrace();             
         }
 
@@ -227,7 +227,7 @@ public class PartialHTTP1Server {
 
         String[] fields = request[0].split(" ");
         String resource = fields[1];        
-        String response = "HTTP/1.0 " + StatusCode._200.toString() + CRLF;
+        String response = SUPPORTED_VERSION + " "  + StatusCode._200.toString() + CRLF;
 
         try{
         
@@ -237,11 +237,11 @@ public class PartialHTTP1Server {
             response += getHeaders(file);
 
         }catch (AccessDeniedException e) {
-            response = "HTTP/1.0 " + StatusCode._403.toString();
+            response = SUPPORTED_VERSION + " "  + StatusCode._403.toString();
         }catch (FileNotFoundException e) {
-            response = "HTTP/1.0 " + StatusCode._404.toString();
+            response = SUPPORTED_VERSION + " "  + StatusCode._404.toString();
         }catch (IOException e){
-            response = "HTTP/1.0 " + StatusCode._500;    
+            response = SUPPORTED_VERSION + " "  + StatusCode._500;    
             e.printStackTrace();            
         }
 
