@@ -54,9 +54,10 @@ public class ClientHandler implements Runnable {
             String[] fields = request[0].split(" ");	// split the first line into fields to validate request
 
             // Check that request is valid
+
             if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
             else if (fields.length != 3) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();     // check that the request line contains only 3 fields
-            else if (!fields[2].trim().equals(PartialHTTP1Server.SUPPORTED_VERSION)) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString()).getBytes();   // check the client http version
+            else if (!isValidVersion(fields[2])) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString()).getBytes();   // check the client http version
             else if (!handlerMap.containsKey(fields[0])) response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // check that the request is valid method
             else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
 
@@ -65,6 +66,15 @@ public class ClientHandler implements Runnable {
             
         } catch(IOException e) {
             System.err.println("[Error] failed to communicate with client");
+        }
+    }
+
+    private boolean isValidVersion(String version) {
+        try {
+            System.out.println("VERSION: " + Double.parseDouble(version.trim().split("/")[1]));
+            return Double.parseDouble(version.trim().split("/")[1]) <= 1.0;
+        } catch (Exception e) {
+            return false;
         }
     }
 
