@@ -1,15 +1,18 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 
 public class ClientHandler implements Runnable {
 
     private Socket clientSocket;
     private HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap;
+    private int active_count;
 
-    public ClientHandler(Socket clientSocket, HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap) {
+    public ClientHandler(Socket clientSocket, HashMap<String, PartialHTTP1Server.RequestHandler> handlerMap, int active_count) {
         this.clientSocket = clientSocket;
         this.handlerMap = handlerMap;
+        this.active_count = active_count;
     }
 
     @Override
@@ -18,8 +21,8 @@ public class ClientHandler implements Runnable {
                 DataOutputStream output = new DataOutputStream(clientSocket.getOutputStream());) {
 
             byte[] response = {};
-
-            if(PartialHTTP1Server.getActiveCount() > PartialHTTP1Server.MAXIMUM_THREAD_COUNT) {        // If maximum thread count was reached, deny service to client
+            
+            if(active_count > PartialHTTP1Server.MAXIMUM_THREAD_COUNT) {        // If maximum thread count was reached, deny service to client
                 System.out.println("Connection from " + clientSocket.getInetAddress() + " denied: Maximum connected clients reached");
                 response = (PartialHTTP1Server.SUPPORTED_VERSION + " " + StatusCode._503.toString()).getBytes();     
                 sendResponseAndClose(output, response);
@@ -66,12 +69,12 @@ public class ClientHandler implements Runnable {
             
         } catch(IOException e) {
             System.err.println("[Error] failed to communicate with client");
+            PartialHTTP1Server.decrimentActiveCount();
         }
     }
 
     private boolean isValidVersion(String version) {
         try {
-            System.out.println("VERSION: " + Double.parseDouble(version.trim().split("/")[1]));
             return Double.parseDouble(version.trim().split("/")[1]) <= 1.0;
         } catch (Exception e) {
             return false;
@@ -79,8 +82,7 @@ public class ClientHandler implements Runnable {
     }
 
     private void sendResponseAndClose(DataOutputStream output, byte[] response) throws IOException {
-        System.out.println("====================================================\nSending response to: " + clientSocket.getInetAddress() + "\n********************************************\n" + response + "\n====================================================");
-        // if (response.charAt(response.length()-1) != '\n') response = response + "\n";
+        System.out.println("====================================================\nSending response to: " + clientSocket.getInetAddress() + "\n********************************************\n" + new String(response, StandardCharsets.UTF_8) + "\n====================================================");
         output.write(response);	// Send response back to client
         output.flush();
         try {
@@ -88,9 +90,8 @@ public class ClientHandler implements Runnable {
         } catch(InterruptedException e) {
             System.err.println("[Error] error occured while sending message to client");
         }
-        System.out.println("Closing connection with client: " + clientSocket.getInetAddress());
         output.close();
         clientSocket.close();
-        PartialHTTP1Server.setActiveCount(PartialHTTP1Server.getActiveCount()-1);
+        PartialHTTP1Server.decrimentActiveCount();
     }
 }

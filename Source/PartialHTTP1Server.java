@@ -52,9 +52,9 @@ public class PartialHTTP1Server {
             Socket clientSocket;
             while ((clientSocket = serverSocket.accept()) != null) {
                 // Accepts a new connection from a client and submits it to a thread executor to be handled by the thread handler
-                System.out.println("New Connection From: " + clientSocket.getInetAddress());
-                setActiveCount(getActiveCount() + 1);
-                executor.submit(new ClientHandler(clientSocket, handlerMap));
+                incrimentActiveCount();
+                System.out.println("New Connection From: " + clientSocket.getInetAddress() + " Active Connections: " + getActiveCount());
+                executor.submit(new ClientHandler(clientSocket, handlerMap, getActiveCount()));
             }
 
         } catch (IOException e) {
@@ -69,8 +69,12 @@ public class PartialHTTP1Server {
         return activeThreadCount;
     }
 
-    public synchronized static void setActiveCount(int new_count) {
-        activeThreadCount = new_count;
+    public synchronized static void incrimentActiveCount() {
+        activeThreadCount++;
+    }
+
+    public synchronized static void decrimentActiveCount() {
+        activeThreadCount--;
     }
 
     private static String getMimeType(String path) {
@@ -232,7 +236,6 @@ public class PartialHTTP1Server {
         try{
         
             String cwd = new java.io.File(".").getCanonicalPath();
-            System.out.println(cwd + "/"+ resource);
             File file = new File(cwd + "/"+ resource);
             response += getHeaders(file);
 
