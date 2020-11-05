@@ -224,8 +224,23 @@ public class PartialHTTP1Server {
     }
 
     private static byte[] POST(String[] request) {
+    	
+	/* 1) Check that request is valid POST request
+		(only POST request specific errors would need to be checked,
+		the rest should have been checked before this function is executed)
+	*  2) Decode entity body
+	*  3) Execute requested script, using parameters from decoded entity body
+	*  4) Format and return response
+	*/
+	
         return GET(request);
     }
+	
+    private static String execute(String application, HashMap<String, String> parameters) {
+
+    }
+
+
 
     private static byte[] HEAD(String[] request) {
 
