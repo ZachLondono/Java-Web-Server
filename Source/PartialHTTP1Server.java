@@ -235,8 +235,55 @@ public class PartialHTTP1Server {
 	
         return GET(request);
     }
-	
-    private static String execute(String application, HashMap<String, String> parameters) {
+
+    
+    public static byte[] execute(String program, HashMap<String,String> params) {
+
+        /*
+
+        EXAMPLE USE
+
+        HashMap<String, String> params = new HashMap<>();
+        params.put("key1", "value1");
+        params.put("key2", "value2");
+        params.put("key3", "value3");
+
+        String program = "upcase.cgi";
+
+        byte[] output = execute(program, params);
+        if (output == null) {
+            // error
+        }
+
+        */
+
+        ProcessBuilder builder = new ProcessBuilder("./cgi_bin/" + program);
+
+        try {
+
+            Process p = builder.start();
+
+            BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
+            
+            String paramString = "";
+            for (String key : params.keySet())
+                paramString += (key + "=" + params.get(key)) + "&";
+
+            bWriter.write(paramString.substring(0,paramString.length() - 2));
+            bWriter.close();
+
+            BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            String programOutput= "";
+            String currentLine = null;
+            while ((currentLine = input.readLine()) != null)
+                programOutput += currentLine + "\n";
+            
+            return programOutput.getBytes();
+    
+        } catch (Exception e) {
+            return null;
+        }
 
     }
 
