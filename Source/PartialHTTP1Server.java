@@ -233,11 +233,70 @@ public class PartialHTTP1Server {
 	*  4) Format and return response
 	*/
 	
+	String encoded_body = "";
+	String decoded_body = decode(encoded_body);
+	
         return GET(request);
     }
 
-    
-    public static byte[] execute(String program, HashMap<String,String> params) {
+    private static string decode(String string) {
+        
+        if(string==null) {
+            return "Empty String inserted..Please try again";
+        }
+        
+        ArrayList<Integer> arr = new ArrayList<>();    
+        for(int i=0;i<string.length();i++) {   
+                if(i<string.length()-1 &&
+		 string.charAt(i)=='!' &&
+		 (string.charAt(i+1)=='!' ||
+		 string.charAt(i+1)=='*' ||
+		 string.charAt(i+1)=='\'' ||
+		 string.charAt(i+1)=='(' ||
+		 string.charAt(i+1)==')' ||
+		 string.charAt(i+1)==';' ||
+		 string.charAt(i+1)==':' ||
+		 string.charAt(i+1)=='@' ||
+		 string.charAt(i+1)=='$'||
+		 string.charAt(i+1)=='+'||
+		 string.charAt(i+1)==',' ||
+		 string.charAt(i+1)=='/' ||
+		 string.charAt(i+1)=='?' ||
+		 string.charAt(i+1)=='#' ||
+		 string.charAt(i+1)=='[' ||
+		 string.charAt(i+1)==']' ||
+		 string.charAt(i+1)==' ')){        
+                    arr.add(i);                    
+                    i=i+1;                    
+                }
+        }
+        
+        String str3="";
+
+        int val =0;
+        for(int i=0;i<string.length();i++) {    
+            //1 == 1,3    
+            for(int j=0;j<arr.size();j++) {        
+                //1==1
+                if(arr.get(j)==i) {
+                    val=1;            
+                }
+            }    
+            if(val==1) {
+                val=0;
+                continue;//starts the i th lopp again    
+            }else {
+                
+                str3=str3+string.charAt(i);
+                val=0;
+                
+            }
+        }        
+
+    	return str3;
+    }
+
+    private static byte[] execute(String program, HashMap<String,String> params) {
 
         /*
 
