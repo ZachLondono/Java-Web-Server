@@ -188,7 +188,7 @@ public class PartialHTTP1Server {
                             Date lastModifiedDate = new Date(file.lastModified());
                             // Compare it against file's last modified date, if the file is older than the ifModifiedDate, then we return status 304 Not Modified, with the expiration date 
                             if (lastModifiedDate.compareTo(ifModifiedDate) < 0)
-                                response = SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;;
+                                response = SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;
                             break;
                         } catch(ParseException ex){
                             // malformed if-modified-since, ignore it
@@ -231,15 +231,54 @@ public class PartialHTTP1Server {
 	*  2) Decode entity body
 	*  3) Execute requested script, using parameters from decoded entity body
 	*  4) Format and return response
-	*/
-	
-	String encoded_body = "";
-	String decoded_body = decode(encoded_body);
-	
-        return GET(request);
+    */
+        
+        if (request.length > 1) {
+            for (int i = 0; i < request.length; i++) {
+                int index = 0;
+                if ((index = request[i].indexOf("Content-Type: ", 0)) != -1) {
+                    String content_type = request[i].substring(index);
+
+                    if (!content_type.equals("application/x-www-form-urlencoded"))  {        
+                        String response = SUPPORTED_VERSION + " "  + StatusCode._500;
+                        return response.getBytes();
+                    }
+
+                }
+            }
+        }
+
+        String[] fields = request[0].split(" ");
+        String executable = fields[1];        
+
+        String cwd = new java.io.File(".").getCanonicalPath();
+        File file = new File(cwd + "/"+ resource);
+
+        // if (executable doesn't exist) {
+        //      file not found error 
+        // }
+            
+        String encoded_body = request[request.length - 2];
+        
+        String decoded_body = decode(encoded_body);
+
+        byte[] output = execute(executable, decoded_body);
+
+        if (output == null) {
+            // internal server error
+        }
+
+        byte[] response_bytes = (SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF).getBytes();
+        
+        byte[] response = new byte[output.length + response_bytes.length];
+
+        System.arraycopy(response_bytes, 0, response, 0, response_bytes.length);
+        System.arraycopy(output, 0, response, response_bytes.length, output.length);
+        
+        return response;
     }
 
-    private static string decode(String string) {
+    private static String decode(String string) {
         
         if(string==null) {
             return "Empty String inserted..Please try again";
@@ -248,24 +287,24 @@ public class PartialHTTP1Server {
         ArrayList<Integer> arr = new ArrayList<>();    
         for(int i=0;i<string.length();i++) {   
                 if(i<string.length()-1 &&
-		 string.charAt(i)=='!' &&
-		 (string.charAt(i+1)=='!' ||
-		 string.charAt(i+1)=='*' ||
-		 string.charAt(i+1)=='\'' ||
-		 string.charAt(i+1)=='(' ||
-		 string.charAt(i+1)==')' ||
-		 string.charAt(i+1)==';' ||
-		 string.charAt(i+1)==':' ||
-		 string.charAt(i+1)=='@' ||
-		 string.charAt(i+1)=='$'||
-		 string.charAt(i+1)=='+'||
-		 string.charAt(i+1)==',' ||
-		 string.charAt(i+1)=='/' ||
-		 string.charAt(i+1)=='?' ||
-		 string.charAt(i+1)=='#' ||
-		 string.charAt(i+1)=='[' ||
-		 string.charAt(i+1)==']' ||
-		 string.charAt(i+1)==' ')){        
+                    string.charAt(i)=='!' &&
+                    (string.charAt(i+1)=='!' ||
+                    string.charAt(i+1)=='*' ||
+                    string.charAt(i+1)=='\'' ||
+                    string.charAt(i+1)=='(' ||
+                    string.charAt(i+1)==')' ||
+                    string.charAt(i+1)==';' ||
+                    string.charAt(i+1)==':' ||
+                    string.charAt(i+1)=='@' ||
+                    string.charAt(i+1)=='$'||
+                    string.charAt(i+1)=='+'||
+                    string.charAt(i+1)==',' ||
+                    string.charAt(i+1)=='/' ||
+                    string.charAt(i+1)=='?' ||
+                    string.charAt(i+1)=='#' ||
+                    string.charAt(i+1)=='[' ||
+                    string.charAt(i+1)==']' ||
+                    string.charAt(i+1)==' ')) {        
                     arr.add(i);                    
                     i=i+1;                    
                 }
@@ -296,25 +335,7 @@ public class PartialHTTP1Server {
     	return str3;
     }
 
-    private static byte[] execute(String program, HashMap<String,String> params) {
-
-        /*
-
-        EXAMPLE USE
-
-        HashMap<String, String> params = new HashMap<>();
-        params.put("key1", "value1");
-        params.put("key2", "value2");
-        params.put("key3", "value3");
-
-        String program = "upcase.cgi";
-
-        byte[] output = execute(program, params);
-        if (output == null) {
-            // error
-        }
-
-        */
+    private static byte[] execute(String program, String params) {
 
         ProcessBuilder builder = new ProcessBuilder("./cgi_bin/" + program);
 
@@ -323,12 +344,13 @@ public class PartialHTTP1Server {
             Process p = builder.start();
 
             BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
-            
+          
+	  /*
             String paramString = "";
             for (String key : params.keySet())
                 paramString += (key + "=" + params.get(key)) + "&";
-
-            bWriter.write(paramString.substring(0,paramString.length() - 2));
+	*/
+            bWriter.write(params);
             bWriter.close();
 
             BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -345,8 +367,6 @@ public class PartialHTTP1Server {
         }
 
     }
-
-
 
     private static byte[] HEAD(String[] request) {
 
