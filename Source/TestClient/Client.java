@@ -19,16 +19,18 @@ public class Client {
 			BufferedReader in = new BufferedReader(new InputStreamReader(clientsocket.getInputStream()));
 		) {
 			
-			out.println("GET 123 HTTP/1.1");
+			// out.println("GET 123 HTTP/1.1");
+			out.println("POST /cgi_bin/upcase.cgi HTTP/1.0\n" +
+						"From: me@mycomputer\n" +
+						"User-Agent: telnet\n" +
+						"Content-Type: application/x-www-form-urlencoded\n" + 
+						"Content-Length: 14\n\n"+
+						"x=1!&2=y");
 			System.out.println("Server: " + in.readLine());
 
 		} catch (Exception e) {
 			System.err.println("Don't know about host " + hostName);
 			System.exit(1);
-		}/* catch (IOException e) {
-			System.err.println("Couldn't get I/O for the connection to " + hostName);
-			System.exit(1);
- 		} */
-
+		}
 	}
 }

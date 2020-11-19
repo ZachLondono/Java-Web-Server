@@ -154,18 +154,27 @@ public class PartialHTTP1Server {
     }
 
     private static byte[] checkExecutable(String path) {
-        String cwd = new java.io.File(".").getCanonicalPath();
-        File file = new File(cwd + "/"+ resource);
 
-        if (file.exists()) {
+        String cwd = "";
+        try {
+            cwd = new java.io.File(".").getCanonicalPath();
+        } catch (Exception e) {
+            e.printStackTrace();
+            String response = SUPPORTED_VERSION + " "  + StatusCode._500;
+            return response.getBytes();
+        }
+
+        File file = new File(cwd + "/"+ path);
+
+        if (!file.exists()) {
             String response = SUPPORTED_VERSION + " "  + StatusCode._404;
             return response.getBytes();
         }
-        if (file.canExecute()) {
+        if (!file.canExecute()) {
             String response = SUPPORTED_VERSION + " "  + StatusCode._403;
             return response.getBytes();
         }
-        if (executable.endsWith(".cgi")) {
+        if (!path.endsWith(".cgi")) {
             String response = SUPPORTED_VERSION + " "  + StatusCode._405;
             return response.getBytes();
         }
@@ -210,33 +219,46 @@ public class PartialHTTP1Server {
 
     private static String execute(String program, String params, String from, String userAgent) {
 
-        ProcessBuilder builder = new ProcessBuilder("./cgi_bin/" + program);
-        builder.environment().put("CONTENT_LENGTH", params.length() + "");
-        builder.environment().put("SCRIPT_NAME", program);
-        builder.environment().put("SERVER_NAME", InetAddress.getLocalHost().getHostName());
-        builder.environment().put("SERVER_PORT", PORT + "");
-        if (from != null) builder.environment().put("HTTP_FROM", from);
-        if (userAgent!= null) builder.environment().put("HTTP_USER_AGENT", userAgent);
-
         try {
+
+            System.out.println("Setting up process...");
+
+            ProcessBuilder builder = new ProcessBuilder("./" + program);
+
+            System.out.println("Setting up environment...");
+
+            builder.environment().put("CONTENT_LENGTH", params.length() + "");
+            builder.environment().put("SCRIPT_NAME", program);
+            builder.environment().put("SERVER_NAME", InetAddress.getLocalHost().getHostName());
+            builder.environment().put("SERVER_PORT", PORT + "");
+            if (from != null) builder.environment().put("HTTP_FROM", from);
+            if (userAgent!= null) builder.environment().put("HTTP_USER_AGENT", userAgent);
+
+            System.out.println("Environment set up finished");
 
             Process p = builder.start();
 
+            System.out.println("Process started");
+
             BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
 
+            System.out.println("Passing in parameters to process...");
             bWriter.write(params);
             bWriter.close();
 
             BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
+            System.out.println("Reading in process output...");
             String programOutput= "";
             String currentLine = null;
             while ((currentLine = input.readLine()) != null)
                 programOutput += currentLine + "\n";
             
-            return programOutput;
+            System.out.println("Returning process output");
+            return programOutput.substring(0, programOutput.length() - 1);
     
         } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
 
@@ -315,7 +337,7 @@ public class PartialHTTP1Server {
     }
 
     private static byte[] POST(String[] request) {
-        
+
         // Parsing the headers
         String from = null;
         String userAgent = null;
@@ -328,17 +350,17 @@ public class PartialHTTP1Server {
                 if (request[i].contains("Content-Type: ")) {
 
                     contains_content_type = true;
-                    String content_type = request[i].substring(request[i].indexOf(" "));
+                    String content_type = request[i].substring(request[i].indexOf(" ") + 1);
 
-                    if (!content_type.equals("application/x-www-form-urlencoded"))  {        
+                    if (!content_type.equals("application/x-www-form-urlencoded"))  {     
                         String response = SUPPORTED_VERSION + " "  + StatusCode._500;
                         return response.getBytes();
                     }
 
-                } else if (request[i].contains("Content-length:")) {
+                } else if (request[i].contains("Content-Length:")) {
                 
                     contains_content_length = true;
-                    String content_length = request[i].substring(request[i].indexOf(" "));
+                    String content_length = request[i].substring(request[i].indexOf(" ") + 1);
 
                     try {
                         Integer.parseInt(content_length);
@@ -348,9 +370,9 @@ public class PartialHTTP1Server {
                     }
                 
                 } else if (request[i].contains("From:")) {
-                    from = request[i].substring(request[i].indexOf(" "));
+                    from = request[i].substring(request[i].indexOf(" ") + 1);
                 } else if (request[i].contains("User-Agent:")) {
-                    from = request[i].substring(request[i].indexOf(" "));
+                    from = request[i].substring(request[i].indexOf(" ") + 1);
                 }
 
             }
@@ -361,7 +383,8 @@ public class PartialHTTP1Server {
             return response.getBytes();
         }
 
-        if (!contains_content_type)  {        
+        if (!contains_content_type)  {     
+            System.out.println("No Content Type!");   
             String response = SUPPORTED_VERSION + " "  + StatusCode._500;
             return response.getBytes();
         }
@@ -369,6 +392,8 @@ public class PartialHTTP1Server {
         // three firs fields of the request, "HTTP/1.0 executable POST"
         String[] fields = request[0].split(" ");
         String executable = fields[1];        
+
+        System.out.println("Executable: " + executable);
 
         // if the executable is invalid, it will return the byte[] error response
         byte[] response;
@@ -378,12 +403,15 @@ public class PartialHTTP1Server {
         String encoded_body = request[request.length - 2];
         String decoded_body = decode(encoded_body);
 
+        System.out.println("Encoded Body: " + encoded_body);
+        System.out.println("Decoded Body: " + decoded_body);
+
         String output = execute(executable, decoded_body, from, userAgent);
         if (output == null) return (SUPPORTED_VERSION + " "  + StatusCode._500).getBytes();
 
         response = (SUPPORTED_VERSION + " "  + StatusCode._200.toString() + CRLF + 
                                 "Content-Type: text/html" + CRLF + 
-                                "Content-Length: " + output.length + CRLF + CRLF
+                                "Content-Length: " + output.length() + CRLF + CRLF
                                 + output + CRLF
                                 ).getBytes();     
         
