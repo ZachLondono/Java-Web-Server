@@ -155,6 +155,11 @@ public class PartialHTTP1Server {
 
     private static byte[] checkExecutable(String path) {
 
+        if (!path.endsWith(".cgi")) {
+            String response = SUPPORTED_VERSION + " "  + StatusCode._405;
+            return response.getBytes();
+        }
+
         String cwd = "";
         try {
             cwd = new java.io.File(".").getCanonicalPath();
@@ -172,10 +177,6 @@ public class PartialHTTP1Server {
         }
         if (!file.canExecute()) {
             String response = SUPPORTED_VERSION + " "  + StatusCode._403;
-            return response.getBytes();
-        }
-        if (!path.endsWith(".cgi")) {
-            String response = SUPPORTED_VERSION + " "  + StatusCode._405;
             return response.getBytes();
         }
 
@@ -221,11 +222,7 @@ public class PartialHTTP1Server {
 
         try {
 
-            System.out.println("Setting up process...");
-
             ProcessBuilder builder = new ProcessBuilder("./" + program);
-
-            System.out.println("Setting up environment...");
 
             builder.environment().put("CONTENT_LENGTH", params.length() + "");
             builder.environment().put("SCRIPT_NAME", program);
@@ -234,27 +231,22 @@ public class PartialHTTP1Server {
             if (from != null) builder.environment().put("HTTP_FROM", from);
             if (userAgent!= null) builder.environment().put("HTTP_USER_AGENT", userAgent);
 
-            System.out.println("Environment set up finished");
 
             Process p = builder.start();
 
-            System.out.println("Process started");
-
             BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
 
-            System.out.println("Passing in parameters to process...");
             bWriter.write(params);
             bWriter.close();
 
             BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
-            System.out.println("Reading in process output...");
             String programOutput= "";
             String currentLine = null;
             while ((currentLine = input.readLine()) != null)
                 programOutput += currentLine + "\n";
             
-            System.out.println("Returning process output");
+            if (programOutput.length() == 0) return programOutput;
             return programOutput.substring(0, programOutput.length() - 1);
     
         } catch (Exception e) {
@@ -345,14 +337,13 @@ public class PartialHTTP1Server {
         boolean contains_content_type = false;
         if (request.length > 1) {
             for (int i = 0; i < request.length; i++) {
-                int index = 0;
                 
                 if (request[i].contains("Content-Type: ")) {
 
                     contains_content_type = true;
-                    String content_type = request[i].substring(request[i].indexOf(" ") + 1);
+                    String content_type = request[i].substring(request[i].indexOf(" ") + 1).strip();
 
-                    if (!content_type.equals("application/x-www-form-urlencoded"))  {     
+                    if (!content_type.equals("application/x-www-form-urlencoded"))  {
                         String response = SUPPORTED_VERSION + " "  + StatusCode._500;
                         return response.getBytes();
                     }
@@ -360,7 +351,7 @@ public class PartialHTTP1Server {
                 } else if (request[i].contains("Content-Length:")) {
                 
                     contains_content_length = true;
-                    String content_length = request[i].substring(request[i].indexOf(" ") + 1);
+                    String content_length = request[i].substring(request[i].indexOf(" ") + 1).strip();
 
                     try {
                         Integer.parseInt(content_length);
@@ -385,6 +376,7 @@ public class PartialHTTP1Server {
 
         if (!contains_content_type)  {     
             System.out.println("No Content Type!");   
+            System.out.println("Content Type MISSSING");
             String response = SUPPORTED_VERSION + " "  + StatusCode._500;
             return response.getBytes();
         }
@@ -409,10 +401,15 @@ public class PartialHTTP1Server {
         String output = execute(executable, decoded_body, from, userAgent);
         if (output == null) return (SUPPORTED_VERSION + " "  + StatusCode._500).getBytes();
 
-        response = (SUPPORTED_VERSION + " "  + StatusCode._200.toString() + CRLF + 
-                                "Content-Type: text/html" + CRLF + 
-                                "Content-Length: " + output.length() + CRLF + CRLF
-                                + output + CRLF
+        String response_code = output.length() == 0 ? StatusCode._204.toString() : StatusCode._200.toString(); 
+        
+        response = (SUPPORTED_VERSION + " "  + response_code + CRLF + 
+                                "Content-Length: " + output.length() + CRLF + 
+                                "Content-Type: text/html" + CRLF +
+                                "Allow: GET, POST, HEAD" + CRLF +
+                                "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF +
+                                "Content-Encoding: identity" + CRLF + CRLF +
+                                output + CRLF + CRLF
                                 ).getBytes();     
         
         return response;

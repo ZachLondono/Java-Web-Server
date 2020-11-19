@@ -1,5 +1,6 @@
 public enum StatusCode { 
-    _200(200, "OK"), 
+    _200(200, "OK"),  
+    _204(204, "No Content"), 
     _304(304, "Not Modified"),
     _400(400, "Bad Request"),
     _403(403, "Forbidden"), 
