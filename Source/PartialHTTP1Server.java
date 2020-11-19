@@ -2,21 +2,23 @@ import java.net.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.Pattern;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.nio.file.AccessDeniedException;
 
 public class PartialHTTP1Server {
 
+    public static int PORT;
     public static final String SUPPORTED_VERSION = "HTTP/1.0";
     public static final int MAXIMUM_THREAD_COUNT = 50; 
-    private static int activeThreadCount;
-    private static HashMap<String, RequestHandler> handlerMap;
     public final static String CRLF  = "" + (char) 0x0D + (char) 0x0A; 
 
+    private static int activeThreadCount;
+    private static HashMap<String, RequestHandler> handlerMap;
+    
     public static void main(String[] args) {
 
-        final int PORT;
         ExecutorService executor = Executors.newCachedThreadPool();
 
         if (args.length != 1) {
@@ -151,6 +153,95 @@ public class PartialHTTP1Server {
 
     }
 
+    private static byte[] checkExecutable(String path) {
+        String cwd = new java.io.File(".").getCanonicalPath();
+        File file = new File(cwd + "/"+ resource);
+
+        if (file.exists()) {
+            String response = SUPPORTED_VERSION + " "  + StatusCode._404;
+            return response.getBytes();
+        }
+        if (file.canExecute()) {
+            String response = SUPPORTED_VERSION + " "  + StatusCode._403;
+            return response.getBytes();
+        }
+        if (executable.endsWith(".cgi")) {
+            String response = SUPPORTED_VERSION + " "  + StatusCode._405;
+            return response.getBytes();
+        }
+
+        return null;
+    }
+
+    private static String decode(String string) {
+        
+        ArrayList<Integer> arr = new ArrayList<>();    
+        for(int i=0;i<string.length();i++) {   
+                if(i<string.length()-1 && Pattern.matches("^[!][!*'();:@$+,/?#\\[\\]\\s\\t]", string.substring(i,i+2))) {        
+                    arr.add(i);                    
+                    i=i+1;                    
+                }
+        }
+
+        String str3="";
+
+        int val =0;
+        for(int i=0;i<string.length();i++) {    
+            //1 == 1,3    
+            for(int j=0;j<arr.size();j++) {        
+                //1==1
+                if(arr.get(j)==i) {
+                    val=1;            
+                }
+            }    
+            if(val==1) {
+                val=0;
+                continue;//starts the i th lopp again    
+            }else {
+                
+                str3=str3+string.charAt(i);
+                val=0;
+                
+            }
+        }        
+
+    	return str3;
+    }
+
+    private static String execute(String program, String params, String from, String userAgent) {
+
+        ProcessBuilder builder = new ProcessBuilder("./cgi_bin/" + program);
+        builder.environment().put("CONTENT_LENGTH", params.length() + "");
+        builder.environment().put("SCRIPT_NAME", program);
+        builder.environment().put("SERVER_NAME", InetAddress.getLocalHost().getHostName());
+        builder.environment().put("SERVER_PORT", PORT + "");
+        if (from != null) builder.environment().put("HTTP_FROM", from);
+        if (userAgent!= null) builder.environment().put("HTTP_USER_AGENT", userAgent);
+
+        try {
+
+            Process p = builder.start();
+
+            BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
+
+            bWriter.write(params);
+            bWriter.close();
+
+            BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            String programOutput= "";
+            String currentLine = null;
+            while ((currentLine = input.readLine()) != null)
+                programOutput += currentLine + "\n";
+            
+            return programOutput;
+    
+        } catch (Exception e) {
+            return null;
+        }
+
+    }
+
     // --------- Method Handler Implementations --------------
     
     static interface RequestHandler {
@@ -224,148 +315,79 @@ public class PartialHTTP1Server {
     }
 
     private static byte[] POST(String[] request) {
-    	
-	/* 1) Check that request is valid POST request
-		(only POST request specific errors would need to be checked,
-		the rest should have been checked before this function is executed)
-	*  2) Decode entity body
-	*  3) Execute requested script, using parameters from decoded entity body
-	*  4) Format and return response
-    */
         
+        // Parsing the headers
+        String from = null;
+        String userAgent = null;
+        boolean contains_content_length = false;
+        boolean contains_content_type = false;
         if (request.length > 1) {
             for (int i = 0; i < request.length; i++) {
                 int index = 0;
-                if ((index = request[i].indexOf("Content-Type: ", 0)) != -1) {
-                    String content_type = request[i].substring(index);
+                
+                if (request[i].contains("Content-Type: ")) {
+
+                    contains_content_type = true;
+                    String content_type = request[i].substring(request[i].indexOf(" "));
 
                     if (!content_type.equals("application/x-www-form-urlencoded"))  {        
                         String response = SUPPORTED_VERSION + " "  + StatusCode._500;
                         return response.getBytes();
                     }
 
+                } else if (request[i].contains("Content-length:")) {
+                
+                    contains_content_length = true;
+                    String content_length = request[i].substring(request[i].indexOf(" "));
+
+                    try {
+                        Integer.parseInt(content_length);
+                    } catch (NumberFormatException e) {
+                        String response = SUPPORTED_VERSION + " "  + StatusCode._411;
+                        return response.getBytes();
+                    }
+                
+                } else if (request[i].contains("From:")) {
+                    from = request[i].substring(request[i].indexOf(" "));
+                } else if (request[i].contains("User-Agent:")) {
+                    from = request[i].substring(request[i].indexOf(" "));
                 }
+
             }
         }
 
+        if (!contains_content_length) {
+            String response = SUPPORTED_VERSION + " "  + StatusCode._411;
+            return response.getBytes();
+        }
+
+        if (!contains_content_type)  {        
+            String response = SUPPORTED_VERSION + " "  + StatusCode._500;
+            return response.getBytes();
+        }
+
+        // three firs fields of the request, "HTTP/1.0 executable POST"
         String[] fields = request[0].split(" ");
         String executable = fields[1];        
 
-        String cwd = new java.io.File(".").getCanonicalPath();
-        File file = new File(cwd + "/"+ resource);
+        // if the executable is invalid, it will return the byte[] error response
+        byte[] response;
+        if ((response = checkExecutable(executable)) != null) return response;        
 
-        // if (executable doesn't exist) {
-        //      file not found error 
-        // }
-            
+        // TODO: might want to look for multi line entity bodys
         String encoded_body = request[request.length - 2];
-        
         String decoded_body = decode(encoded_body);
 
-        byte[] output = execute(executable, decoded_body);
+        String output = execute(executable, decoded_body, from, userAgent);
+        if (output == null) return (SUPPORTED_VERSION + " "  + StatusCode._500).getBytes();
 
-        if (output == null) {
-            // internal server error
-        }
-
-        byte[] response_bytes = (SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF).getBytes();
-        
-        byte[] response = new byte[output.length + response_bytes.length];
-
-        System.arraycopy(response_bytes, 0, response, 0, response_bytes.length);
-        System.arraycopy(output, 0, response, response_bytes.length, output.length);
+        response = (SUPPORTED_VERSION + " "  + StatusCode._200.toString() + CRLF + 
+                                "Content-Type: text/html" + CRLF + 
+                                "Content-Length: " + output.length + CRLF + CRLF
+                                + output + CRLF
+                                ).getBytes();     
         
         return response;
-    }
-
-    private static String decode(String string) {
-        
-        if(string==null) {
-            return "Empty String inserted..Please try again";
-        }
-        
-        ArrayList<Integer> arr = new ArrayList<>();    
-        for(int i=0;i<string.length();i++) {   
-                if(i<string.length()-1 &&
-                    string.charAt(i)=='!' &&
-                    (string.charAt(i+1)=='!' ||
-                    string.charAt(i+1)=='*' ||
-                    string.charAt(i+1)=='\'' ||
-                    string.charAt(i+1)=='(' ||
-                    string.charAt(i+1)==')' ||
-                    string.charAt(i+1)==';' ||
-                    string.charAt(i+1)==':' ||
-                    string.charAt(i+1)=='@' ||
-                    string.charAt(i+1)=='$'||
-                    string.charAt(i+1)=='+'||
-                    string.charAt(i+1)==',' ||
-                    string.charAt(i+1)=='/' ||
-                    string.charAt(i+1)=='?' ||
-                    string.charAt(i+1)=='#' ||
-                    string.charAt(i+1)=='[' ||
-                    string.charAt(i+1)==']' ||
-                    string.charAt(i+1)==' ')) {        
-                    arr.add(i);                    
-                    i=i+1;                    
-                }
-        }
-        
-        String str3="";
-
-        int val =0;
-        for(int i=0;i<string.length();i++) {    
-            //1 == 1,3    
-            for(int j=0;j<arr.size();j++) {        
-                //1==1
-                if(arr.get(j)==i) {
-                    val=1;            
-                }
-            }    
-            if(val==1) {
-                val=0;
-                continue;//starts the i th lopp again    
-            }else {
-                
-                str3=str3+string.charAt(i);
-                val=0;
-                
-            }
-        }        
-
-    	return str3;
-    }
-
-    private static byte[] execute(String program, String params) {
-
-        ProcessBuilder builder = new ProcessBuilder("./cgi_bin/" + program);
-
-        try {
-
-            Process p = builder.start();
-
-            BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
-          
-	  /*
-            String paramString = "";
-            for (String key : params.keySet())
-                paramString += (key + "=" + params.get(key)) + "&";
-	*/
-            bWriter.write(params);
-            bWriter.close();
-
-            BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-
-            String programOutput= "";
-            String currentLine = null;
-            while ((currentLine = input.readLine()) != null)
-                programOutput += currentLine + "\n";
-            
-            return programOutput.getBytes();
-    
-        } catch (Exception e) {
-            return null;
-        }
-
     }
 
     private static byte[] HEAD(String[] request) {
