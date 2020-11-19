@@ -35,8 +35,6 @@ public class PartialHTTP1Server {
         }
 
         try(ServerSocket serverSocket = new ServerSocket(PORT)) {
-            
-            System.out.println("Server started on port: " + PORT);
 	
             // Maps a given function name to it's defined method
             handlerMap = new HashMap<>();
@@ -236,8 +234,10 @@ public class PartialHTTP1Server {
 
             BufferedWriter bWriter = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
 
-            bWriter.write(params);
-            bWriter.close();
+            if (params != null && bWriter != null) {
+                bWriter.write(params);
+                bWriter.close();
+            }
 
             BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
@@ -246,8 +246,8 @@ public class PartialHTTP1Server {
             while ((currentLine = input.readLine()) != null)
                 programOutput += currentLine + "\n";
             
-            if (programOutput.length() == 0) return programOutput;
-            return programOutput.substring(0, programOutput.length() - 1);
+            // if (programOutput.length() == 0) return programOutput;
+            return programOutput;
     
         } catch (Exception e) {
             e.printStackTrace();
@@ -331,6 +331,7 @@ public class PartialHTTP1Server {
     private static byte[] POST(String[] request) {
 
         // Parsing the headers
+        int content_length = 0;
         String from = null;
         String userAgent = null;
         boolean contains_content_length = false;
@@ -351,19 +352,19 @@ public class PartialHTTP1Server {
                 } else if (request[i].contains("Content-Length:")) {
                 
                     contains_content_length = true;
-                    String content_length = request[i].substring(request[i].indexOf(" ") + 1).strip();
+                    String content_length_value = request[i].substring(request[i].indexOf(" ") + 1).strip();
 
                     try {
-                        Integer.parseInt(content_length);
+                        content_length = Integer.parseInt(content_length_value);
                     } catch (NumberFormatException e) {
                         String response = SUPPORTED_VERSION + " "  + StatusCode._411;
                         return response.getBytes();
                     }
                 
                 } else if (request[i].contains("From:")) {
-                    from = request[i].substring(request[i].indexOf(" ") + 1);
+                    from = request[i].substring(request[i].indexOf(" ") + 1).strip();
                 } else if (request[i].contains("User-Agent:")) {
-                    from = request[i].substring(request[i].indexOf(" ") + 1);
+                    userAgent = request[i].substring(request[i].indexOf(" ") + 1).strip();
                 }
 
             }
@@ -374,9 +375,7 @@ public class PartialHTTP1Server {
             return response.getBytes();
         }
 
-        if (!contains_content_type)  {     
-            System.out.println("No Content Type!");   
-            System.out.println("Content Type MISSSING");
+        if (!contains_content_type)  {  
             String response = SUPPORTED_VERSION + " "  + StatusCode._500;
             return response.getBytes();
         }
@@ -385,18 +384,35 @@ public class PartialHTTP1Server {
         String[] fields = request[0].split(" ");
         String executable = fields[1];        
 
-        System.out.println("Executable: " + executable);
-
         // if the executable is invalid, it will return the byte[] error response
         byte[] response;
         if ((response = checkExecutable(executable)) != null) return response;        
 
-        // TODO: might want to look for multi line entity bodys
-        String encoded_body = request[request.length - 2];
-        String decoded_body = decode(encoded_body);
+        // Finds the beginning of the entity body
+        int entity_body_start = 0;
+        for (int i = 0; i < request.length; i++) {
+            if (request[i].isBlank()) {
+                entity_body_start = i + 1;
+                break;
+            }
+        }
 
-        System.out.println("Encoded Body: " + encoded_body);
-        System.out.println("Decoded Body: " + decoded_body);
+        // reads content_length bytes
+        int bytes_read = 0;
+        int lines_read = 0;
+        String encoded_body = "";
+        while (bytes_read < content_length) {
+            encoded_body += request[entity_body_start + lines_read] + "\n";
+            bytes_read = encoded_body.length();
+            lines_read += 1;
+            if (entity_body_start + lines_read == request.length) {
+                // content length does not match content
+                break;
+            }
+        }
+        encoded_body = encoded_body.substring(0, content_length);
+
+        String decoded_body = decode(encoded_body);
 
         String output = execute(executable, decoded_body, from, userAgent);
         if (output == null) return (SUPPORTED_VERSION + " "  + StatusCode._500).getBytes();
@@ -409,7 +425,7 @@ public class PartialHTTP1Server {
                                 "Allow: GET, POST, HEAD" + CRLF +
                                 "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF +
                                 "Content-Encoding: identity" + CRLF + CRLF +
-                                output + CRLF + CRLF
+                                output + CRLF
                                 ).getBytes();     
         
         return response;
