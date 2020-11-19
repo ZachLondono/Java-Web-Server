@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.nio.file.AccessDeniedException;
 
-public class PartialHTTP1Server {
+public class HTTP1Server {
 
     public static int PORT;
     public static final String SUPPORTED_VERSION = "HTTP/1.0";
@@ -38,9 +38,9 @@ public class PartialHTTP1Server {
 	
             // Maps a given function name to it's defined method
             handlerMap = new HashMap<>();
-            handlerMap.put("GET", PartialHTTP1Server::GET);
-            handlerMap.put("POST", PartialHTTP1Server::POST);
-            handlerMap.put("HEAD", PartialHTTP1Server::HEAD);
+            handlerMap.put("GET", HTTP1Server::GET);
+            handlerMap.put("POST", HTTP1Server::POST);
+            handlerMap.put("HEAD", HTTP1Server::HEAD);
             // The following functions are not implimented
             handlerMap.put("PUT", (request) ->  (SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
             handlerMap.put("DELETE", (request) ->(SUPPORTED_VERSION + " "  + StatusCode._501.toString()).getBytes());
