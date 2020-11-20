@@ -64,6 +64,10 @@ public class HTTP1Server {
 
     }
 
+    /*
+    *--------- Helper Methods --------------
+    */
+
     // Both static functions used to interface with the static activeThreadCount variable are synchronized in order to restrict only 1 thread to access either at a time
     public synchronized static int getActiveCount() {
         return activeThreadCount;
@@ -216,13 +220,14 @@ public class HTTP1Server {
     	return str3;
     }
 
-    private static String execute(String program, String params, String from, String userAgent) {
+    private static String execute(String program, int encoded_length, String params, String from, String userAgent) {
 
         try {
 
             ProcessBuilder builder = new ProcessBuilder("./" + program);
 
-            builder.environment().put("CONTENT_LENGTH", params.length() + "");
+            // builder.environment().put("CONTENT_LENGTH", params.length() + "");
+            builder.environment().put("CONTENT_LENGTH", encoded_length + "");
             builder.environment().put("SCRIPT_NAME", program);
             builder.environment().put("SERVER_NAME", InetAddress.getLocalHost().getHostName());
             builder.environment().put("SERVER_PORT", PORT + "");
@@ -256,8 +261,10 @@ public class HTTP1Server {
 
     }
 
-    // --------- Method Handler Implementations --------------
-    
+    /*
+    *--------- Method Handler Implementations --------------
+    */
+
     static interface RequestHandler {
         abstract byte[] handler(String[] request);
     }
@@ -401,20 +408,27 @@ public class HTTP1Server {
         int bytes_read = 0;
         int lines_read = 0;
         String encoded_body = "";
-        while (bytes_read < content_length) {
-            encoded_body += request[entity_body_start + lines_read] + "\n";
+        // while (bytes_read < content_length) {
+        while (!request[entity_body_start + lines_read].isBlank()) {
+            
+            if(lines_read != 0) encoded_body += "\n";
+            encoded_body += request[entity_body_start + lines_read];
+            
             bytes_read = encoded_body.length();
             lines_read += 1;
+
             if (entity_body_start + lines_read == request.length) {
-                // content length does not match content
+                // end of request, nothing else to read
                 break;
             }
-        }
-        encoded_body = encoded_body.substring(0, content_length);
 
+        }
+
+        // encoded_body = encoded_body.substring(0, content_length);
+        if (content_length != bytes_read) System.out.println("Warning: payload size did not match content length header");
         String decoded_body = decode(encoded_body);
 
-        String output = execute(executable, decoded_body, from, userAgent);
+        String output = execute(executable, content_length, decoded_body, from, userAgent);
         if (output == null) return (SUPPORTED_VERSION + " "  + StatusCode._500).getBytes();
 
         String response_code = output.length() == 0 ? StatusCode._204.toString() : StatusCode._200.toString(); 
