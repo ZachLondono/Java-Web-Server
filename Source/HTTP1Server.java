@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.nio.file.AccessDeniedException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class HTTP1Server {
 
@@ -144,12 +146,17 @@ public class HTTP1Server {
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 
+        LocalDateTime myDateObj = LocalDateTime.now();
+        DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        String formattedDate = myDateObj.format(myFormatObj);
+
         String headers = "Content-Type: " + getMimeType(file.getName()) + CRLF;
         headers += "Content-Length: " + file.length() + CRLF;
         headers += "Last-Modified: " + sdf.format(new Date(file.lastModified())) + CRLF;
         headers += "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;
         headers += "Allow: GET, POST, HEAD" + CRLF;
-        headers += "Content-Encoding: identity";
+        headers += "Content-Encoding: identity" + CRLF;
+        headers += "Set-Cookie: " + formattedDate;
 
         return headers;
 
@@ -264,15 +271,20 @@ public class HTTP1Server {
     private static String validateCookie(String potentialCookie) {
         // Validate the cookie, if it's invalid, return a blank string
         String decodedDateTime = "";
+
+        if (!potentialCookie.contains("lasttime=")) return "";
+
         try{
-            decodedDateTime = URLDecoder.decode(potentialCookie, "UTF-8");
-        } catch (UnsupportedEncodingException e) {}
+            decodedDateTime = URLDecoder.decode(potentialCookie.substring(9, potentialCookie.length()), "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return "";
+        }
 
         return decodedDateTime;
     }
 
     private static byte[] getEditedIndex(String cookieValue) {
-        return ("<html><body><h1>CS 352 Welcome Page </h1><p>Welcome back! Your last visit was at:" + cookieValue + "<p></body></html>").getBytes();
+        return ("<html><body><h1>CS 352 Welcome Page </h1><p>Welcome back! Your last visit was at: " + cookieValue + "<p></body></html>").getBytes();
     }
 
     /*
@@ -327,7 +339,7 @@ public class HTTP1Server {
                         cookieValue = validateCookie(cookieValue); 
                     }
                 }
-            } 
+            }
 
             byte[] payload = (cookieValue.isBlank() && resource.equals("index.html")) ? getFileContent(file) : getEditedIndex(cookieValue);
             response +=  CRLF + CRLF;
