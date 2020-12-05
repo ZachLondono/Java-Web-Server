@@ -261,6 +261,20 @@ public class HTTP1Server {
 
     }
 
+    private static String validateCookie(String potentialCookie) {
+        // Validate the cookie, if it's invalid, return a blank string
+        String decodedDateTime = "";
+        try{
+            decodedDateTime = URLDecoder.decode(potentialCookie, "UTF-8");
+        } catch (UnsupportedEncodingException e) {}
+
+        return decodedDateTime;
+    }
+
+    private static byte[] getEditedIndex(String cookieValue) {
+        return ("<html><body><h1>CS 352 Welcome Page </h1><p>Welcome back! Your last visit was at:" + cookieValue + "<p></body></html>").getBytes();
+    }
+
     /*
     *--------- Method Handler Implementations --------------
     */
@@ -273,16 +287,20 @@ public class HTTP1Server {
 
         String[] fields = request[0].split(Character.toString(32));
         String resource = fields[1];
-        
+
+        if (resource.equals("/")) resource = "index.html"; 
+
         String response = SUPPORTED_VERSION + " "+ StatusCode._200.toString() + CRLF;
         
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 
         try {
-            
+
             String cwd = new java.io.File(".").getCanonicalPath();
             File file = new File(cwd + "/"+ resource);
+
+            String cookieValue = "";
 
             // Generate headers for response
             response += getHeaders(file);
@@ -291,27 +309,27 @@ public class HTTP1Server {
             if (request.length > 1){
                 int x = 0;
                 for(x=0;x<request.length;x++){
-                    if(request[x].contains("If-Modified-Since:")) {
+                    if (request[x].contains("If-Modified-Since:")) {
                         // Get the date substring from the header
                         String ifModifiedString = request[x].substring(request[x].indexOf(" ") + 1);
-                        try{
+                        try {
                             // If the if-modified-since date is of an invalid format, a ParseException will be thrown, so we can ignore the if-modified-date
                             Date ifModifiedDate = sdf.parse(ifModifiedString);
                             Date lastModifiedDate = new Date(file.lastModified());
                             // Compare it against file's last modified date, if the file is older than the ifModifiedDate, then we return status 304 Not Modified, with the expiration date 
                             if (lastModifiedDate.compareTo(ifModifiedDate) < 0)
                                 response = SUPPORTED_VERSION + " "  + StatusCode._304.toString() + CRLF +  "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;
-                            break;
-                        } catch(ParseException ex){
+                        } catch(ParseException ex) {
                             // malformed if-modified-since, ignore it
-                            break;                            
                         }
+                    } else if (request[x].contains("Cookie:")) {
+                        cookieValue = request[x].substring(request[x].indexOf(" ") + 1);
+                        cookieValue = validateCookie(cookieValue); 
                     }
                 }
-
             } 
 
-            byte[] payload = getFileContent(file);
+            byte[] payload = (cookieValue.isBlank() && resource.equals("index.html")) ? getFileContent(file) : getEditedIndex(cookieValue);
             response +=  CRLF + CRLF;
             byte[] response_bytes = response.getBytes();
             byte[] message = new byte[response_bytes.length + payload.length];
