@@ -137,26 +137,34 @@ public class HTTP1Server {
         return Arrays.copyOfRange(buf,0, offset);
     }
 
-    private static String getHeaders(File file) throws FileNotFoundException, AccessDeniedException {
+    private static String getHeaders(File file) throws FileNotFoundException, AccessDeniedException, UnsupportedEncodingException {
+
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 
         // Throw exception if we can't create the headers
         if(!file.exists()) throw new FileNotFoundException();
         if(!file.canRead()) throw new AccessDeniedException("Couldn't read file");
-        
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss z");
-        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+	return getHeaders(file.length(), getMimeType(file.getName()), sdf.format(new Date(file.lastModified())));
+
+    }
+      
+    private static String getHeaders(long contentLength, String mimeType, String lastModified) throws UnsupportedEncodingException {
 
         LocalDateTime myDateObj = LocalDateTime.now();
-        DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedDate = myDateObj.format(myFormatObj);
+	String encodedDateTime = URLEncoder.encode(formattedDate, "UTF-8");
 
-        String headers = "Content-Type: " + getMimeType(file.getName()) + CRLF;
-        headers += "Content-Length: " + file.length() + CRLF;
-        headers += "Last-Modified: " + sdf.format(new Date(file.lastModified())) + CRLF;
+	String headers = "";
+        if (mimeType != null) headers += "Content-Type: " + mimeType + CRLF;
+        headers += "Content-Length: " + contentLength + CRLF;
+        if (lastModified != null) headers += "Last-Modified: " + lastModified + CRLF;
         headers += "Expires: Tue, 1 Jan 2021 1:00:00 GMT" + CRLF;
         headers += "Allow: GET, POST, HEAD" + CRLF;
         headers += "Content-Encoding: identity" + CRLF;
-        headers += "Set-Cookie: " + formattedDate;
+        headers += "Set-Cookie: lasttime=" + encodedDateTime;
 
         return headers;
 
@@ -314,9 +322,6 @@ public class HTTP1Server {
 
             String cookieValue = "";
 
-            // Generate headers for response
-            response += getHeaders(file);
-
             // If the request has headers, we need to check if it has the If-Modified-Since header
             if (request.length > 1){
                 int x = 0;
@@ -341,7 +346,17 @@ public class HTTP1Server {
                 }
             }
 
-            byte[] payload = (cookieValue.isBlank() && resource.equals("index.html")) ? getFileContent(file) : getEditedIndex(cookieValue);
+		
+            byte[] payload = null;
+	    if (!cookieValue.isBlank() && resource.equals("index.html")) {
+            	payload = getEditedIndex(cookieValue);
+            	response += getHeaders(payload.length, getMimeType("index.html"), null);
+	    } else {
+            	payload = getFileContent(file);
+            	response += getHeaders(file);
+	    }
+	    
+
             response +=  CRLF + CRLF;
             byte[] response_bytes = response.getBytes();
             byte[] message = new byte[response_bytes.length + payload.length];
@@ -349,6 +364,7 @@ public class HTTP1Server {
             // combine payload and response
             System.arraycopy(response_bytes, 0, message, 0, response_bytes.length);
             System.arraycopy(payload, 0, message, response_bytes.length, payload.length);
+	    
         
             return message;
 
