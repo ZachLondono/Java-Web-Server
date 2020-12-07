@@ -58,8 +58,16 @@ public class ClientHandler implements Runnable {
 
             // Check that request is valid
 
+	    int usedIndicies = fields.length;
+            if (fields.length != 3) {
+	        usedIndicies = 0;
+		for (int i = 0; i < fields.length; i++) {
+		    if (!fields[i].isBlank()) ++usedIndicies;
+		}
+	    }
+	    
             if (/*request.length == 1 && */ cbuf[offset - 1] != '\n') response = (HTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // should check if there are no headers, then only one newline, if there are headers then only 2 new lines
-            else if (fields.length != 3) response = (HTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();     // check that the request line contains only 3 fields
+	    else if (usedIndicies != 3)	response = (HTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();     // check that the request line contains only 3 fields
             else if (!isValidVersion(fields[2])) response = (HTTP1Server.SUPPORTED_VERSION + " " + StatusCode._505.toString()).getBytes();   // check the client http version
             else if (!handlerMap.containsKey(fields[0])) response = (HTTP1Server.SUPPORTED_VERSION + " " + StatusCode._400.toString()).getBytes();    // check that the request is valid method
             else response = handlerMap.get(fields[0]).handler(request);    // Generate response 
